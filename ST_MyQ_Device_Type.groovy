@@ -56,8 +56,9 @@ metadata
         capability "Switch"
         capability "Refresh"
         capability "Contact Sensor"
+        capability "Sensor"
         
-        attribute "doorStatus", "string"
+        attribute "status", "string"
         attribute "vacationStatus", "string"
         attribute "lastDoorAction", "string"
         
@@ -78,20 +79,20 @@ metadata
 	tiles
     {    
 
-		standardTile("sDoorToggle", "device.doorStatus", width: 1, height: 1, canChangeIcon: false) 
+		standardTile("sDoorToggle", "device.status", width: 1, height: 1, canChangeIcon: false) 
         {
 			state "unknown", label: 'Unknown', icon: "st.unknown.unknown.unknown", action: "refresh.refresh", backgroundColor: "#afafaf"
             state "door_not_found", label:'Not Found', backgroundColor: "#CC1821"            
 
-			state "stopped", label: 'Stopped', icon: "st.contact.contact.open", action: "close", backgroundColor: "#ffdd00"
-			state "closed", label: 'Closed', icon:"st.doors.garage.garage-closed", action: "open", backgroundColor: "#ffffff"
-            state "closing", label: 'Closing', icon:"st.doors.garage.garage-closing", backgroundColor: "#ffdd00"
-			state "open", label: 'Open', icon:"st.doors.garage.garage-open", action: "close", backgroundColor: "#ffdd00"
-            state "opening", label: 'Opening', icon:"st.doors.garage.garage-opening", backgroundColor: "#ffdd00"
-			state "moving", label: 'Moving', icon: "st.motion.motion.active", action: "refresh.refresh", backgroundColor: "#ffdd00"
+			state "stopped", label: 'Stopped', icon: "st.contact.contact.open", action: "close", backgroundColor: "#cc0000"
+			state "closed", label: 'Closed', icon:"st.doors.garage.garage-closed", action: "open", backgroundColor: "#79b821"
+            state "closing", label: 'Closing', icon:"st.doors.garage.garage-closing", backgroundColor: "#ffe71e"
+			state "open", label: 'Open', icon:"st.doors.garage.garage-open", action: "close", backgroundColor: "#ffa81e"
+            state "opening", label: 'Opening', icon:"st.doors.garage.garage-opening", backgroundColor: "#ffe71e"
+			state "moving", label: 'Moving', icon: "st.motion.motion.active", action: "refresh.refresh", backgroundColor: "#ffe71e"
 		}
 
-        standardTile("sRefresh", "device.doorStatus", inactiveLabel: false, decoration: "flat") 
+        standardTile("sRefresh", "device.status", inactiveLabel: false, decoration: "flat") 
         {
 			state "default", label:'', action:"refresh.refresh", icon:"st.secondary.refresh"
 		}
@@ -137,7 +138,7 @@ metadata
         def debugDetailTiles = [] // + ["sContact", "sLogin", "sGetDeviceInfo", "sGetDoorStatus", "sOpenDoor", "sCloseDoor"]
         		
         main(["sDoorToggle"])
-        details(["sDoorToggle", "vLastDoorAction", "sRefresh"] + debugDetailTiles)
+        details(["sDoorToggle", "vLastDoorAction", "sContact", "sRefresh"] + debugDetailTiles)
     }
 
 }

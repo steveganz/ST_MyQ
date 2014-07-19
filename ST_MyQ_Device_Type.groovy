@@ -58,7 +58,7 @@ metadata
         capability "Contact Sensor"
         capability "Sensor"
         
-        attribute "status", "string"
+        attribute "doorStatus", "string"
         attribute "vacationStatus", "string"
         attribute "lastDoorAction", "string"
         
@@ -79,7 +79,7 @@ metadata
 	tiles
     {    
 
-		standardTile("sDoorToggle", "device.status", width: 1, height: 1, canChangeIcon: false) 
+		standardTile("sDoorToggle", "device.doorStatus", width: 1, height: 1, canChangeIcon: false) 
         {
 			state "unknown", label: 'Unknown', icon: "st.unknown.unknown.unknown", action: "refresh.refresh", backgroundColor: "#afafaf"
             state "door_not_found", label:'Not Found', backgroundColor: "#CC1821"            
@@ -92,7 +92,7 @@ metadata
 			state "moving", label: 'Moving', icon: "st.motion.motion.active", action: "refresh.refresh", backgroundColor: "#ffe71e"
 		}
 
-        standardTile("sRefresh", "device.status", inactiveLabel: false, decoration: "flat") 
+        standardTile("sRefresh", "device.doorStatus", inactiveLabel: false, decoration: "flat") 
         {
 			state "default", label:'', action:"refresh.refresh", icon:"st.secondary.refresh"
 		}

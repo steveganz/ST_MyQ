@@ -57,6 +57,7 @@ metadata
         capability "Refresh"
         capability "Contact Sensor"
         capability "Sensor"
+        capability "Momentary"
         
         attribute "doorStatus", "string"
         attribute "vacationStatus", "string"
@@ -69,6 +70,7 @@ metadata
         command "getDoorStatus"
         command "openDoor"
         command "closeDoor"
+        command "push"
 	}
 
 	simulator 
@@ -176,6 +178,18 @@ def poll()
     refresh()
 }
 
+def push() {
+	def cStatus = device.latestValue("doorStatus")
+	
+	if ( cStatus == "open") { 
+		close() 
+		return
+	}
+	if ( cStatus == "closed") {
+		open()
+	}
+}
+
 def on()
 {
 	open()
@@ -186,18 +200,14 @@ def off()
 	close()
 }
 
-
 def refresh()
 {
 	log.debug "Refreshing Door State"
         
-
 	login()
     
     getDoorStatus() { status ->
-            
     	setDoorState(status, true)
-        
         setContactSensorState(status, true)      
         
     	log.debug "Door Status: $status"
@@ -208,9 +218,7 @@ def open()
 {
 	log.debug "Opening Door"
 	
-    
     checkLogin()
-    
     
     def dInitStatus
     def dCurrentStatus = "opening"
@@ -219,38 +227,32 @@ def open()
                    
 	if (dInitStatus == "opening" || dInitStatus == "open" || dInitStatus == "moving") { return }
 
-
 	setDoorState("opening")
     
     openDoor()
 
-
-	// Contact Sensor
-	setContactSensorState("open")      
-
-
 	while (dCurrentStatus == "opening")
     {
 		sleepForDuration(1000) {
-        
         	getDoorStatus(dInitStatus) { status -> dCurrentStatus = status }
         }
     }
     
-	    
 	log.debug "Final Door Status: $dCurrentStatus"
 
 	setDoorState(dCurrentStatus, true)
+	
+	if (dCurrentStatus == "open") {
+		setContactSensorState("open") 
+	}
 }
 
 def close()
 {
 	log.debug "Closing Door"
     
-
 	checkLogin()
     
-        
 	def dInitStatus
     def dCurrentStatus = "closing"
     def dTotalSleep = 0
@@ -259,41 +261,33 @@ def close()
                    
 	if (dInitStatus == "closing" || dInitStatus == "closed" || dInitStatus == "moving") { return }
 
-
 	setDoorState("closing")
 
-
     closeDoor()
-    
-    
-	// Contact Sensor
-	setContactSensorState("closed")
-
 
 	sleepForDuration(7500) { dTotalSleep += it }
     
 	while (dCurrentStatus == "closing" && dTotalSleep <= 15000)
     {
 		sleepForDuration(1000) {
-        	
             dTotalSleep += it
-        	
         	getDoorStatus(dInitStatus) { status -> dCurrentStatus = status }
         }
     }
     
     if (dTotalSleep >= 15000) {
-    
     	log.debug "Exceeded Door Close time: $dTotalSleep"
-        
     	dCurrentStatus = "closed"
     }
 
 	log.debug "Final Door Status: $dCurrentStatus"
 
 	setDoorState(dCurrentStatus, true)
+	
+	if (dCurrentStatus == "closed") {
+		setContactSensorState("closed")
+	}
 }
-
 
 def checkLogin()
 {
@@ -304,36 +298,29 @@ def checkLogin()
     	login()        
     }
     
-    
     if (state.DeviceID == 0)
     {    	
     	getDevice()
     }
 }
 
-
 def login()
 {
 	log.debug "Logging In to Webservice"
 
-
 	def loginQParams = [
-    
 		username: settings.username,
         password: settings.password,
         culture: "en"
     ]
 
     callApiGet("api/user/validatewithculture", [], loginQParams) { response ->
-    	
         state.Login = [
-
             BrandID: response.data.BrandName,
             UserID: response.data.UserId,
             SecToken: response.data.SecurityToken,
             Expiration: (new Date()).getTime() + 300000
         ]
-        
 		log.debug "Sec Token: $state.Login.SecToken"
     }
 }
@@ -342,35 +329,24 @@ def getDevice()
 {
 	log.debug "Getting MyQ Devices"
     
-    
     // If we set a door name that looks like a device id, use it as a device id
     if ((settings.door_name ?: "blank").isLong() == true) {
-    
     	log.debug "Door Name:  Assuming Door Name is a Device ID, $settings.door_name"
-        
         state.DeviceID = settings.door_name
-        
         return
     }
        
-    
-    
     def loginQParams = [
-
 		securityToken: state.Login.SecToken
     ]
-    
 	
     callApiGet("api/userdevicedetails/get", [], loginQParams) { response ->
-        
         
         def garageDevices = response.getData().Devices.findAll{ it.TypeId == 47 || it.TypeID == 259 }
 		def allDevices = response.getData().Devices
         
-        
         // Find all devices on MyQ Account
         allDevices.each { pDevice ->
-        
         	def dDeviceName = pDevice.Attributes.find{ it.Name == "desc" }?.Value ?: "Home"
             def dTypeID = pDevice?.TypeId
             def dDeviceID = pDevice?.DeviceId            
@@ -378,46 +354,30 @@ def getDevice()
         	log.debug "Device Discovered:  Type ID: $dTypeID, Device Name: $dDeviceName, Device ID: $dDeviceID"        
         }
         
-
 		if (garageDevices.isEmpty() == true) {
-
 			log.debug "Device Discovery found no supported door devices"
-	
     		setDoorState("door_not_found")
-
 			return
         }
 
-		
         state.DeviceID = 0
-        
 
 		garageDevices.each{ pDevice ->
-        
         	def doorAttrib = pDevice.Attributes.find{ it.Name == "desc" }
-        
         	if (doorAttrib.Value.toLowerCase() == settings.door_name.toLowerCase()) {
-            
             	log.debug "Door ID: $pDevice.DeviceId"
-                
 				state.DeviceID = pDevice.DeviceId
             }
         }
         
-        
         if (state.DeviceID == 0) {
-        
         	log.debug "Supported door devices were found but none matched name '$settings.door_name'"
         }
-		
     }
-    
 }
-
 
 def getDoorStatus(initialStatus = null, callback)
 {
-	
     def loginQParams = [
 
 		securityToken: state.Login.SecToken,
@@ -425,14 +385,10 @@ def getDoorStatus(initialStatus = null, callback)
         name: "doorstate"
     ]
 
-
 	callApiGet("api/deviceattribute/getdeviceattribute", [], loginQParams) { response ->
         
     	def doorState = translateDoorStatus( response.data.AttributeValue, initialStatus )
-		
 		calcLastActivityTime( response.data.UpdatedTime.toLong() )
-
-                
         callback(doorState)        
     }
 }
@@ -480,9 +436,7 @@ def openDoor()
         AttributeName: "desireddoorstate"
     ]
 
-
 	callApiPut("api/deviceattribute/putdeviceattribute", [], loginQParams) { response ->
-        
         // if error, do something?
 	}
 }
@@ -491,14 +445,11 @@ def openDoor()
 def closeDoor()
 { 	
     def loginQParams = [
-		
         AttributeValue: "0",
         AttributeName: "desireddoorstate"
     ]
 
-
 	callApiPut("api/deviceattribute/putdeviceattribute", [], loginQParams) { response ->
-
         // if error, do something?
 	}
 }
@@ -508,12 +459,10 @@ def setContactSensorState(status, isStateChange = false)
 {
     // Sync contact sensor
     if (status == "open" || status == "opening" || status == "stopped") {
-
 		sendEvent(name: "contact", value: "open", display: true, descriptionText: "Contact is open")
         sendEvent(name: "switch", value: "on", display: true, descriptionText: "Switch is on")
     }
 	else if (status == "closed" || status == "closing") {
-    
     	sendEvent(name: "contact", value: "closed", display: true, descriptionText: "Contact is closed")
         sendEvent(name: "switch", value: "off", display: true, descriptionText: "Switch is off")
     }
@@ -523,14 +472,11 @@ def setContactSensorState(status, isStateChange = false)
 def setDoorState(status, isStateChange = false)
 {
 	if (isStateChange == true) {
-    	
         sendEvent(name: "doorStatus", value: status, isStateChange: true, display: true, descriptionText: "Door is $status")
     }
     else {
-    
 		sendEvent(name: "doorStatus", value: status, display: true, descriptionText: "Door is $status")
     }
-
 }
 
 
@@ -575,9 +521,7 @@ def callApiPut(apipath, headers = [], queryParams = [], callback = {})
 	def baseURL = "https://myqexternal.myqdevice.com/"
     
 	def finalHeaders = [
-    
     	"User-Agent": "${state.Login.BrandID}/1332 (iPhone; iOS 7.1.1; Scale/2.00)"
-            
     ] + headers
 
 
@@ -588,8 +532,7 @@ def callApiPut(apipath, headers = [], queryParams = [], callback = {})
     	securityToken: state.Login.SecToken
         
     ] + queryParams
-    
-    
+   
     def finalParams = [ 
     
     	uri: baseURL, 
@@ -599,22 +542,17 @@ def callApiPut(apipath, headers = [], queryParams = [], callback = {})
         body: finalQParams
 	]
     
-    
 	//log.debug finalParams
-    
     
     try
     {
     	httpPut(finalParams) { response ->
         
         	if (response.data.ErrorMessage) {
-            
             	log.debug "API Error: $response.data"
             }
-            
             callback(response)
         }
-        
     }
     catch (Error e)
     {
@@ -623,7 +561,6 @@ def callApiPut(apipath, headers = [], queryParams = [], callback = {})
     finally
     {
     }
-
 }
 
 
@@ -631,13 +568,9 @@ def callApiGet(apipath, headers = [], queryParams = [], callback = {})
 {
 	def baseURL = "https://myqexternal.myqdevice.com/"
     
-    
     def finalHeaders = [
-    
     	"User-Agent": "${state.Login.BrandID}/1332 (iPhone; iOS 7.1.1; Scale/2.00)"
-            
     ] + headers
-    
     
     def finalQParams = [
     
@@ -645,7 +578,6 @@ def callApiGet(apipath, headers = [], queryParams = [], callback = {})
         filterOn: "true"
     
     ] + queryParams
-    
     
     def finalParams = [ 
     
@@ -655,10 +587,8 @@ def callApiGet(apipath, headers = [], queryParams = [], callback = {})
         query: finalQParams
 	]
     
-    
     //log.debug finalParams
-    
-    
+
     try
     {
     	httpGet(finalParams) { response ->
@@ -678,6 +608,4 @@ def callApiGet(apipath, headers = [], queryParams = [], callback = {})
     finally
     {
     }
-    
-
 }

@@ -226,22 +226,24 @@ def refresh()
 def open()
 {
 	log.debug "Opening Door"
-	
-    checkLogin()
-    
+
     def dInitStatus
     def dCurrentStatus = "opening"
     
+    	
+    checkLogin()
     getDoorStatus() { dStatus -> dInitStatus = dStatus }
                    
 	if (dInitStatus == "opening" || dInitStatus == "open" || dInitStatus == "moving") { return }
 
 	setDoorState("opening", true)
+	setContactSensorState("open", true)		// Always open, unless it's closed
     
     openDoor()
 
 	while (dCurrentStatus == "opening")
     {
+    	checkLogin()		// we might have exceeded our allotted time while "sleeping"
 		sleepForDuration(1000) {
         	getDoorStatus(dInitStatus) { dStatus -> dCurrentStatus = dStatus }
         }
@@ -250,23 +252,18 @@ def open()
 	log.debug "Final Door Status: $dCurrentStatus"
 
 	setDoorState(dCurrentStatus, true)
-	
-	if (dCurrentStatus == "open") {
-		setContactSensorState("open") 
-	}
 }
 
 def close()
 {
 	log.debug "Closing Door"
     
-	checkLogin()
-    
 	def dInitStatus
     def dCurrentStatus = "closing"
     def dTotalSleep = 0
     def dMaxSleep = 20000 // enough for an 8-foot door
     
+   	checkLogin()
     getDoorStatus() { dStatus -> dInitStatus = dStatus }
                    
 	if (dInitStatus == "closing" || dInitStatus == "closed" || dInitStatus == "moving") { return }
@@ -275,10 +272,11 @@ def close()
 
     closeDoor()
 
-	sleepForDuration(7500) { dTotalSleep += it }
+	sleepForDuration(7500) { dTotalSleep += it } // wait for the 7 seconds of beeping
     
 	while (dCurrentStatus == "closing" && dTotalSleep <= dMaxSleep)
     {
+    	checkLogin()		// we might have exceeded our allotted time while "sleeping"
 		sleepForDuration(1000) {
             dTotalSleep += it
         	getDoorStatus(dInitStatus) { dStatus -> dCurrentStatus = dStatus }
@@ -296,7 +294,7 @@ def close()
 	setDoorState(dCurrentStatus, true)
 	
 	if (dCurrentStatus == "closed") {
-		setContactSensorState("closed")
+		setContactSensorState("closed", true)		// Not closed until we are actually closed.
 	}
 }
 

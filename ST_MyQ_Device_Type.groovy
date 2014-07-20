@@ -61,7 +61,7 @@ metadata
         capability "Actuator"
         
         attribute "doorStatus", "string"
-        attribute "vacationStatus", "string"
+//        attribute "vacationStatus", "string"
         attribute "lastDoorAction", "string"
         
         command "open"
@@ -82,20 +82,20 @@ metadata
 	tiles
     {    
 
-		standardTile("sDoorToggle", "device.doorStatus", width: 1, height: 1, canChangeIcon: false) 
-        {
+		standardTile("sDoorToggle", "device.status", width: 1, height: 1, canChangeIcon: false) 
+		{
 			state "unknown", label: 'Unknown', icon: "st.unknown.unknown.unknown", action: "refresh.refresh", backgroundColor: "#afafaf"
-            state "door_not_found", label:'Not Found', backgroundColor: "#CC1821"            
+			state "door_not_found", label:'Not Found', backgroundColor: "#CC1821"            
 
 			state "stopped", label: 'Stopped', icon: "st.contact.contact.open", action: "close", backgroundColor: "#cc0000"
 			state "closed", label: 'Closed', icon:"st.doors.garage.garage-closed", action: "open", backgroundColor: "#79b821"
-            state "closing", label: 'Closing', icon:"st.doors.garage.garage-closing", backgroundColor: "#ffe71e"
+			state "closing", label: 'Closing', icon:"st.doors.garage.garage-closing", backgroundColor: "#ffe71e"
 			state "open", label: 'Open', icon:"st.doors.garage.garage-open", action: "close", backgroundColor: "#ffa81e"
-            state "opening", label: 'Opening', icon:"st.doors.garage.garage-opening", backgroundColor: "#ffe71e"
+			state "opening", label: 'Opening', icon:"st.doors.garage.garage-opening", backgroundColor: "#ffe71e"
 			state "moving", label: 'Moving', icon: "st.motion.motion.active", action: "refresh.refresh", backgroundColor: "#ffe71e"
 		}
 
-        standardTile("sRefresh", "device.doorStatus", inactiveLabel: false, decoration: "flat") 
+        standardTile("sRefresh", "device.status", inactiveLabel: false, decoration: "flat") 
         {
 			state "default", label:'', action:"refresh.refresh", icon:"st.secondary.refresh"
 		}
@@ -180,7 +180,7 @@ def poll()
 }
 
 def push() {
-	def cStatus = doorStatus
+	def cStatus = device.status
     log.debug "Push: doorStatus is $cStatus"
 	
 	if ( cStatus == "open") { 
@@ -207,13 +207,14 @@ def refresh()
 {
 	log.debug "Refreshing Door State"
         
-	login()
+//	login()
+	checkLogin()
     
-    getDoorStatus() { status ->
-    	setDoorState(status, true)
-        setContactSensorState(status, true)      
+    getDoorStatus() { dStatus ->
+    	setDoorState(dStatus, true)
+        setContactSensorState(dStatus, true)      
         
-    	log.debug "Door Status: $status"
+    	log.debug "Door Status: $dStatus"
     }
 }
 
@@ -226,18 +227,18 @@ def open()
     def dInitStatus
     def dCurrentStatus = "opening"
     
-    getDoorStatus() { status -> dInitStatus = status }
+    getDoorStatus() { dStatus -> dInitStatus = dStatus }
                    
 	if (dInitStatus == "opening" || dInitStatus == "open" || dInitStatus == "moving") { return }
 
-	setDoorState("opening")
+	setDoorState("opening", true)
     
     openDoor()
 
 	while (dCurrentStatus == "opening")
     {
 		sleepForDuration(1000) {
-        	getDoorStatus(dInitStatus) { status -> dCurrentStatus = status }
+        	getDoorStatus(dInitStatus) { dStatus -> dCurrentStatus = dStatus }
         }
     }
     
@@ -259,13 +260,13 @@ def close()
 	def dInitStatus
     def dCurrentStatus = "closing"
     def dTotalSleep = 0
-    def dMaxSleep = 17000 // enough for an 8-foot door
+    def dMaxSleep = 20000 // enough for an 8-foot door
     
-    getDoorStatus() { status -> dInitStatus = status }
+    getDoorStatus() { dStatus -> dInitStatus = dStatus }
                    
 	if (dInitStatus == "closing" || dInitStatus == "closed" || dInitStatus == "moving") { return }
 
-	setDoorState("closing")
+	setDoorState("closing", true)
 
     closeDoor()
 
@@ -275,7 +276,7 @@ def close()
     {
 		sleepForDuration(1000) {
             dTotalSleep += it
-        	getDoorStatus(dInitStatus) { status -> dCurrentStatus = status }
+        	getDoorStatus(dInitStatus) { dStatus -> dCurrentStatus = dStatus }
         }
     }
     
@@ -460,10 +461,10 @@ def closeDoor()
 }
 
 
-def setContactSensorState(status, isStateChange = false)
+def setContactSensorState(newStatus, isStateChange = false)
 {
     // Sync contact sensor - closed/off ONLY if door status is closed
-    if (status == "closed") {
+    if (newStatus == "closed") {
     	sendEvent(name: "contact", value: "closed", display: true, descriptionText: "Contact is closed")
         sendEvent(name: "switch", value: "off", display: true, descriptionText: "Switch is off")
     }
@@ -474,31 +475,31 @@ def setContactSensorState(status, isStateChange = false)
 }
 
 
-def setDoorState(status, isStateChange = false)
+def setDoorState(newStatus, isStateChange = false)
 {
-	log.debug "Setting door status to $status"
+	log.debug "Setting door status to $newStatus, state $isStateChange"
     
 	if (isStateChange == true) {
-        sendEvent(name: "doorStatus", value: status, isStateChange: true, display: true, descriptionText: "Door is $status")
+        sendEvent(name: "status", value: "${newStatus}", isStateChange: true, display: true, descriptionText: "Door is $newStatus")
     }
     else {
-		sendEvent(name: "doorStatus", value: status, display: true, descriptionText: "Door is $status")
+		sendEvent(name: "status", value: "${newStatus}", display: true, descriptionText: "Door is $newStatus")
     }
 }
 
 
-def translateDoorStatus(status, initStatus = null)
+def translateDoorStatus(iStatus, initStatus = null)
 {
 	def dReturn = "unknown"
     
-	if (status == "2") dReturn = "closed"
-	else if (status == "1" || status == "9") dReturn = "open"
-	else if (status == "4" || (status == "8" && initStatus == "closed")) dReturn = "opening"
-	else if (status == "5" || (status == "8" && initStatus == "open")) dReturn = "closing"
-    else if (status == "3") dReturn = "stopped"
-    else if (status == "8" && initStatus == null) dReturn = "moving"
+	if (iStatus == "2") dReturn = "closed"
+	else if (iStatus == "1" || iStatus == "9") dReturn = "open"
+	else if (iStatus == "4" || (iStatus == "8" && initStatus == "closed")) dReturn = "opening"
+	else if (iStatus == "5" || (iStatus == "8" && initStatus == "open")) dReturn = "closing"
+    else if (iStatus == "3") dReturn = "stopped"
+    else if (iStatus == "8" && initStatus == null) dReturn = "moving"
     
-    if (dReturn == "unknown") { log.debug "Unknown Door Status ID: $status" }
+    if (dReturn == "unknown") { log.debug "Unknown Door Status ID: $iStatus" }
 
 	return dReturn
 }
@@ -563,6 +564,7 @@ def callApiPut(apipath, headers = [], queryParams = [], callback = {})
     }
     catch (Error e)
     {
+		log.debug "APIput error: $e"
 		setDoorState("unknown", true)
     }
     finally
@@ -610,6 +612,7 @@ def callApiGet(apipath, headers = [], queryParams = [], callback = {})
     }
     catch (Error e)
     {
+    	log.debug "APIget error: $e"
 		setDoorState("unknown", true)
     }
     finally

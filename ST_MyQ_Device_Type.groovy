@@ -58,6 +58,7 @@ metadata
         capability "Contact Sensor"
         capability "Sensor"
         capability "Momentary"
+        capability "Actuator"
         
         attribute "doorStatus", "string"
         attribute "vacationStatus", "string"
@@ -70,7 +71,7 @@ metadata
         command "getDoorStatus"
         command "openDoor"
         command "closeDoor"
-        command "push"
+//        command "push"
 	}
 
 	simulator 
@@ -179,7 +180,8 @@ def poll()
 }
 
 def push() {
-	def cStatus = device.latestValue("doorStatus")
+	def cStatus = doorStatus
+    log.debug "Push: doorStatus is $cStatus"
 	
 	if ( cStatus == "open") { 
 		close() 
@@ -187,6 +189,7 @@ def push() {
 	}
 	if ( cStatus == "closed") {
 		open()
+        return
 	}
 }
 
@@ -256,6 +259,7 @@ def close()
 	def dInitStatus
     def dCurrentStatus = "closing"
     def dTotalSleep = 0
+    def dMaxSleep = 17000 // enough for an 8-foot door
     
     getDoorStatus() { status -> dInitStatus = status }
                    
@@ -267,7 +271,7 @@ def close()
 
 	sleepForDuration(7500) { dTotalSleep += it }
     
-	while (dCurrentStatus == "closing" && dTotalSleep <= 15000)
+	while (dCurrentStatus == "closing" && dTotalSleep <= dMaxSleep)
     {
 		sleepForDuration(1000) {
             dTotalSleep += it
@@ -275,8 +279,9 @@ def close()
         }
     }
     
-    if (dTotalSleep >= 15000) {
+    if (dTotalSleep >= dMaxSleep) {
     	log.debug "Exceeded Door Close time: $dTotalSleep"
+        log.debug "Ending status = $dCurrentStatus"
     	dCurrentStatus = "closed"
     }
 
@@ -457,20 +462,22 @@ def closeDoor()
 
 def setContactSensorState(status, isStateChange = false)
 {
-    // Sync contact sensor
-    if (status == "open" || status == "opening" || status == "stopped") {
-		sendEvent(name: "contact", value: "open", display: true, descriptionText: "Contact is open")
-        sendEvent(name: "switch", value: "on", display: true, descriptionText: "Switch is on")
-    }
-	else if (status == "closed" || status == "closing") {
+    // Sync contact sensor - closed/off ONLY if door status is closed
+    if (status == "closed") {
     	sendEvent(name: "contact", value: "closed", display: true, descriptionText: "Contact is closed")
         sendEvent(name: "switch", value: "off", display: true, descriptionText: "Switch is off")
+    }
+    else {
+		sendEvent(name: "contact", value: "open", display: true, descriptionText: "Contact is open")
+        sendEvent(name: "switch", value: "on", display: true, descriptionText: "Switch is on")
     }
 }
 
 
 def setDoorState(status, isStateChange = false)
 {
+	log.debug "Setting door status to $status"
+    
 	if (isStateChange == true) {
         sendEvent(name: "doorStatus", value: status, isStateChange: true, display: true, descriptionText: "Door is $status")
     }

@@ -3,6 +3,8 @@
  *
  *  Copyright 2014 Adam Heinmiller
  *
+ *  Updated per License by Barry A. Burke
+ * 
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
  *
@@ -180,7 +182,11 @@ def poll()
 }
 
 def push() {
-	def cStatus = device.status
+	def cStatus
+    
+    checkLogin()
+    
+	getDoorStatus() { dStatus -> cStatus = dStatus }
     log.debug "Push: doorStatus is $cStatus"
 	
 	if ( cStatus == "open") { 
@@ -207,7 +213,6 @@ def refresh()
 {
 	log.debug "Refreshing Door State"
         
-//	login()
 	checkLogin()
     
     getDoorStatus() { dStatus ->
@@ -514,11 +519,11 @@ def sleepForDuration(duration, callback = {})
     while (dTotalSleep <= duration)
     {            
 		try { httpGet("http://australia.gov.au/404") { } } catch (e) { }
-        
         dTotalSleep = (new Date().getTime() - dStart)
     }
 
     //log.debug "Slept ${dTotalSleep}ms"
+   // unschedule()
 
 	callback(dTotalSleep)
 }
